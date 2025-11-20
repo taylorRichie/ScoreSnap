@@ -121,7 +121,7 @@ export async function GET(request: NextRequest) {
     if (recentIdsError) throw recentIdsError
 
     // Step 2: Get full data with nested relations
-    let recentSessions = []
+    let recentSessions: any[] = []
     if (recentSessionIds && recentSessionIds.length > 0) {
       const ids = recentSessionIds.map(s => s.id)
       const { data: sessionsData, error: sessionsError } = await supabase
