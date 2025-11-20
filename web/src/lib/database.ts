@@ -481,35 +481,65 @@ export async function persistParsedScoreboardWithResolution(
 
       for (const teamData of parsedData.teams) {
         let teamName = teamData.name
+        const teamBowlerNames = teamData.bowlers.map(name => name.toLowerCase().trim())
 
-        // If AI assigned "Team A" but Team A already exists, reassign to next available letter
-        if (teamName === 'Team A' && existingTeamNames.has('Team A')) {
-          // Find next available team letter
-          let nextLetter = 'B'
-          while (existingTeamNames.has(`Team ${nextLetter}`)) {
-            nextLetter = String.fromCharCode(nextLetter.charCodeAt(0) + 1)
+        console.log(`🔍 Processing team "${teamName}" with bowlers: [${teamBowlerNames.join(', ')}]`)
+
+        // Check if an existing team in this session has the SAME bowlers
+        let matchingTeam: any = null
+        
+        if (existingTeams && existingTeams.length > 0) {
+          // Fetch team bowlers for each existing team
+          for (const existingTeam of existingTeams) {
+            const { data: teamBowlersData } = await supabase
+              .from('team_bowlers')
+              .select(`
+                bowler_id,
+                bowlers:bowler_id (
+                  canonical_name
+                )
+              `)
+              .eq('team_id', existingTeam.id)
+
+            const existingBowlerNames = (teamBowlersData || [])
+              .map((tb: any) => tb.bowlers?.canonical_name?.toLowerCase().trim())
+              .filter(Boolean)
+              .sort()
+
+            const newBowlerNamesSorted = [...teamBowlerNames].sort()
+
+            console.log(`  Comparing with existing team "${existingTeam.name}":`)
+            console.log(`    Existing: [${existingBowlerNames.join(', ')}]`)
+            console.log(`    New:      [${newBowlerNamesSorted.join(', ')}]`)
+
+            // Check if bowler lists match exactly
+            if (existingBowlerNames.length === newBowlerNamesSorted.length &&
+                existingBowlerNames.every((name, idx) => name === newBowlerNamesSorted[idx])) {
+              matchingTeam = existingTeam
+              console.log(`  ✅ Found matching team by bowlers: ${existingTeam.name} (${existingTeam.id})`)
+              break
+            }
           }
-          teamName = `Team ${nextLetter}`
-          console.log(`🔄 Team A already exists, reassigning to ${teamName}`)
         }
 
-        // Check if team already exists in this session
-        const { data: existingTeam, error: findError } = await supabase
-          .from('teams')
-          .select('id, name')
-          .eq('session_id', sessionId)
-          .eq('name', teamName)
-          .maybeSingle()
-
-        if (findError) {
-          console.error(`Error checking for existing team: ${findError.message}`)
-        }
-
-        if (existingTeam) {
-          // Team already exists, reuse it
-          teamMap[teamData.name] = existingTeam.id
-          console.log(`✅ Found existing team ${existingTeam.id} for ${teamName}`)
+        if (matchingTeam) {
+          // Reuse existing team with same bowlers
+          teamMap[teamData.name] = matchingTeam.id
+          console.log(`✅ Reusing team ${matchingTeam.id} (${matchingTeam.name}) for "${teamData.name}"`)
         } else {
+          // No matching team found, need to create a new one
+          
+          // If AI assigned "Team A" but Team A already exists, reassign to next available letter
+          if (teamName === 'Team A' && existingTeamNames.has('Team A')) {
+            // Find next available team letter
+            let nextLetter = 'B'
+            while (existingTeamNames.has(`Team ${nextLetter}`)) {
+              nextLetter = String.fromCharCode(nextLetter.charCodeAt(0) + 1)
+            }
+            teamName = `Team ${nextLetter}`
+            console.log(`🔄 Team A already exists with different bowlers, assigning to ${teamName}`)
+          }
+
           // Create new team
           const { data: team, error: teamError } = await supabase
             .from('teams')
@@ -527,7 +557,7 @@ export async function persistParsedScoreboardWithResolution(
 
           teamMap[teamData.name] = team.id
           existingTeamNames.add(teamName) // Add to set for next iteration
-          console.log(`✅ Created team ${team.id} for ${teamName}`)
+          console.log(`✅ Created new team ${team.id} for ${teamName}`)
         }
       }
     }
@@ -613,60 +643,109 @@ export async function persistParsedScoreboardWithResolution(
       // Create games and frames for this bowler
       console.log(`Processing ${bowlerData.games.length} games for bowler ${bowlerData.name}`)
       for (const gameData of bowlerData.games) {
-        // Skip if this game already exists in the series
+        let gameId: string
+        let shouldCreateFrames = false
+
+        // Check if this game already exists in the series
         if (seriesInfo.existingGames.includes(gameData.game_number)) {
-          console.log(`  ⏭️  Skipping game ${gameData.game_number} (already exists)`)
-          continue
-        }
+          // Game exists - check if we need to update it with frame data
+          const { data: existingGame } = await supabase
+            .from('games')
+            .select('id, is_partial')
+            .eq('series_id', seriesId)
+            .eq('game_number', gameData.game_number)
+            .single()
 
-        console.log(`  Creating game ${gameData.game_number} with score ${gameData.total_score}`)
+          if (existingGame) {
+            gameId = existingGame.id
+            
+            // If existing game is partial but new data has frames, update it
+            if (existingGame.is_partial && gameData.frames && gameData.frames.length > 0) {
+              console.log(`  🔄 Updating game ${gameData.game_number} with frame data (was partial)`)
+              
+              const { error: updateError } = await supabase
+                .from('games')
+                .update({
+                  total_score: gameData.total_score,
+                  is_partial: false
+                })
+                .eq('id', gameId)
 
-        const { data: game, error: gameError } = await supabase
-          .from('games')
-          .insert({
-            series_id: seriesId,
-            game_number: gameData.game_number,
-            bowler_id: bowlerId,
-            total_score: gameData.total_score,
-            is_partial: !gameData.frames || gameData.frames.length === 0
-          })
-          .select()
-          .single()
-
-        if (gameError) {
-          throw new Error(`Failed to create game: ${gameError.message}`)
-        }
-
-        const gameId = game.id
-        console.log(`  ✅ Created game ${gameId} for game ${gameData.game_number}`)
-        gameIds.push(gameId)
-
-        // Create frames if available
-        if (gameData.frames && gameData.frames.length > 0) {
-          console.log(`  Creating ${gameData.frames.length} frames for game ${gameData.game_number}`)
-          const frameInserts = gameData.frames.map(frame => {
-            // Debug logging for spare frames
-            if (frame.notation && frame.notation.includes('/')) {
-              console.log(`  🎳 Inserting spare frame: Frame ${frame.frame_number}, roll_1=${frame.roll_1}, roll_2=${frame.roll_2}, notation="${frame.notation}"`)
+              if (updateError) {
+                console.error(`  ❌ Failed to update game: ${updateError.message}`)
+              }
+              
+              shouldCreateFrames = true
+            } else {
+              console.log(`  ⏭️  Skipping game ${gameData.game_number} (already complete)`)
+              continue
             }
-            return {
-              game_id: gameId,
-              frame_number: frame.frame_number,
-              roll_1: frame.roll_1,
-              roll_2: frame.roll_2,
-              roll_3: frame.roll_3,
-              notation: frame.notation
-            }
-          })
-
-          const { error: framesError } = await supabase
-            .from('frames')
-            .insert(frameInserts)
-
-          if (framesError) {
-            throw new Error(`Failed to create frames: ${framesError.message}`)
+          } else {
+            console.log(`  ⏭️  Skipping game ${gameData.game_number} (exists but couldn't fetch)`)
+            continue
           }
-          console.log(`  ✅ Created ${gameData.frames.length} frames for game ${gameData.game_number}`)
+        } else {
+          // Create new game
+          console.log(`  Creating game ${gameData.game_number} with score ${gameData.total_score}`)
+
+          const { data: game, error: gameError } = await supabase
+            .from('games')
+            .insert({
+              series_id: seriesId,
+              game_number: gameData.game_number,
+              bowler_id: bowlerId,
+              total_score: gameData.total_score,
+              is_partial: !gameData.frames || gameData.frames.length === 0
+            })
+            .select()
+            .single()
+
+          if (gameError) {
+            throw new Error(`Failed to create game: ${gameError.message}`)
+          }
+
+          gameId = game.id
+          console.log(`  ✅ Created game ${gameId} for game ${gameData.game_number}`)
+          gameIds.push(gameId)
+          shouldCreateFrames = true
+        }
+
+        // Create frames if available and needed
+        if (shouldCreateFrames && gameData.frames && gameData.frames.length > 0) {
+          // First, check if frames already exist (in case of race conditions)
+          const { data: existingFrames } = await supabase
+            .from('frames')
+            .select('id')
+            .eq('game_id', gameId)
+
+          if (existingFrames && existingFrames.length > 0) {
+            console.log(`  Frames already exist for game ${gameData.game_number}, skipping frame creation`)
+          } else {
+            console.log(`  Creating ${gameData.frames.length} frames for game ${gameData.game_number}`)
+            const frameInserts = gameData.frames.map(frame => {
+              // Debug logging for spare frames
+              if (frame.notation && frame.notation.includes('/')) {
+                console.log(`  🎳 Inserting spare frame: Frame ${frame.frame_number}, roll_1=${frame.roll_1}, roll_2=${frame.roll_2}, notation="${frame.notation}"`)
+              }
+              return {
+                game_id: gameId,
+                frame_number: frame.frame_number,
+                roll_1: frame.roll_1,
+                roll_2: frame.roll_2,
+                roll_3: frame.roll_3,
+                notation: frame.notation
+              }
+            })
+
+            const { error: framesError } = await supabase
+              .from('frames')
+              .insert(frameInserts)
+
+            if (framesError) {
+              throw new Error(`Failed to create frames: ${framesError.message}`)
+            }
+            console.log(`  ✅ Created ${gameData.frames.length} frames for game ${gameData.game_number}`)
+          }
         }
       }
 

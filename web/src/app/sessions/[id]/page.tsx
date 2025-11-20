@@ -157,7 +157,7 @@ export default function SessionDetailPage() {
 
   useEffect(() => {
     if (!authLoading && sessionId) {
-      fetchSessionData()
+        fetchSessionData()
     }
   }, [authLoading, sessionId])
 
@@ -582,6 +582,11 @@ export default function SessionDetailPage() {
       : 0
   const maxGames = bowlerScores.length > 0 ? Math.max(...bowlerScores.map((b) => b.games.length)) : 0
   
+  // Get the actual game numbers that exist (e.g., [3] or [1, 2, 3])
+  const actualGameNumbers = bowlerScores.length > 0
+    ? Array.from(new Set(bowlerScores.flatMap(b => b.games.map(g => g.game_number)))).sort((a, b) => a - b)
+    : []
+  
   // Calculate session statistics
   const allScores = bowlerScores.flatMap(b => b.games.map(g => g.total_score).filter(s => s !== null)) as number[]
   const highScore = allScores.length > 0 ? Math.max(...allScores) : 0
@@ -691,20 +696,20 @@ export default function SessionDetailPage() {
                   </div>
                   {user && (
                     <>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={handleEditName}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setDeleteDialogOpen(true)}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={handleEditName}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setDeleteDialogOpen(true)}
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
                     </>
                   )}
                 </>
@@ -1121,8 +1126,7 @@ export default function SessionDetailPage() {
                 const teamBowlers = bowlerScores.filter(bs => teamBowlerIds.includes(bs.bowler.id))
                 
                 // Calculate team totals per game
-                const teamTotals = Array.from({ length: maxGames }, (_, i) => {
-                  const gameNum = i + 1
+                const teamTotals = actualGameNumbers.map((gameNum) => {
                   return teamBowlers.reduce((sum, bowler) => {
                     const game = bowler.games.find(g => g.game_number === gameNum)
                     return sum + (game?.total_score || 0)
@@ -1213,7 +1217,7 @@ export default function SessionDetailPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Bowler</TableHead>
-                        {Array.from({ length: maxGames }, (_, i) => i + 1).map((gameNum) => (
+                        {actualGameNumbers.map((gameNum) => (
                           <TableHead key={gameNum} className="text-center">
                             Game {gameNum}
                           </TableHead>
@@ -1233,7 +1237,7 @@ export default function SessionDetailPage() {
                               {bowlerScore.bowler.canonical_name}
                             </Link>
                           </TableCell>
-                          {Array.from({ length: maxGames }, (_, i) => i + 1).map((gameNum) => {
+                          {actualGameNumbers.map((gameNum) => {
                             const game = bowlerScore.games.find((g) => g.game_number === gameNum)
                             return (
                               <TableCell key={gameNum} className="text-center">
@@ -1303,7 +1307,7 @@ export default function SessionDetailPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Bowler</TableHead>
-                        {Array.from({ length: maxGames }, (_, i) => i + 1).map((gameNum) => (
+                        {actualGameNumbers.map((gameNum) => (
                           <TableHead key={gameNum} className="text-center">
                             Game {gameNum}
                           </TableHead>
@@ -1323,7 +1327,7 @@ export default function SessionDetailPage() {
                               {bowlerScore.bowler.canonical_name}
                             </Link>
                           </TableCell>
-                          {Array.from({ length: maxGames }, (_, i) => i + 1).map((gameNum) => {
+                          {actualGameNumbers.map((gameNum) => {
                             const game = bowlerScore.games.find((g) => g.game_number === gameNum)
                             return (
                               <TableCell key={gameNum} className="text-center">
