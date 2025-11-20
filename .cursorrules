@@ -1,0 +1,151 @@
+# ScoreSnap Development Rules
+
+## 🚨 CRITICAL: UI Components
+
+**NEVER create custom UI components. ALWAYS use shadcn/ui.**
+
+### Rules:
+1. ✅ **Use shadcn/ui CLI**: `npx shadcn@latest add <component-name> --yes`
+2. ✅ **Keep components VANILLA** - No custom styling that breaks theme compatibility
+3. ✅ **Use Radix Icons (PRIMARY)** - For workflow iconography (@radix-ui/react-icons)
+4. ✅ **Use Lucide Icons (SECONDARY)** - For extended icon set (lucide-react)
+5. ✅ **If a component doesn't exist in shadcn/ui** - ASK the user first before building anything
+6. ✅ **Extend existing shadcn components** only when absolutely necessary and with user approval
+7. ❌ **NEVER** create components from scratch
+8. ❌ **NEVER** add custom Radix UI components directly
+9. ❌ **NEVER** modify shadcn component styling in ways that break themes
+10. ❌ **NEVER** add custom background colors, gradients, or color overrides
+11. ❌ **NEVER** use className with bg-*, from-*, to-* for custom colors
+12. ❌ **NEVER** use hardcoded color classes (e.g., bg-white, text-gray-900, border-red-500)
+13. ✅ **ALWAYS** use theme-aware semantic classes (bg-background, text-foreground, text-muted-foreground, bg-card, text-card-foreground, border-border, text-destructive, etc.)
+14. ❌ **NEVER** use emojis in UI - use icons instead
+
+### Why:
+- shadcn/ui has everything we need
+- Maintains theme compatibility across light/dark modes
+- Consistent design system
+- No maintenance burden from custom components
+- Custom colors break theme switching
+- Hardcoded colors (bg-white, text-gray-900, etc.) don't adapt to themes
+- Semantic classes (bg-background, text-foreground, etc.) automatically adapt to all themes
+- Radix Icons for workflow (primary)
+- Lucide Icons for extended set (secondary)
+- Icons are consistent and theme-aware
+
+### Icon Usage:
+- **Radix Icons (@radix-ui/react-icons)** - PRIMARY for workflow icons
+  - Cross1Icon for strikes (X)
+  - SlashIcon for spares (/)
+  - Workflow and UI actions
+- **Lucide Icons (lucide-react)** - SECONDARY for extended set
+  - When Radix doesn't have the icon
+  - Decorative and content icons
+
+### Available shadcn/ui Components:
+- accordion, alert, alert-dialog, avatar, badge, breadcrumb, button
+- card, checkbox, collapsible, context-menu, dialog, dropdown-menu
+- form, hover-card, input, label, menubar, navigation-menu
+- popover, progress, radio-group, scroll-area, select, separator
+- sheet, skeleton, slider, sonner, switch, table, tabs, toast
+- toggle, toggle-group, toolbar, tooltip
+
+### If You Need Something New:
+1. Check if shadcn/ui has it: https://ui.shadcn.com/docs/components
+2. If yes → Install it with CLI
+3. If no → **ASK THE USER** before proceeding
+
+## Code Style
+
+### TypeScript
+- Use TypeScript for all new files
+- Prefer interfaces over types for object shapes
+- Use proper type annotations
+
+### React
+- Use functional components with hooks
+- Prefer `const` over `let` when possible
+- Use proper dependency arrays in useEffect
+
+### Next.js
+- Use App Router (not Pages Router)
+- Use Server Components by default
+- Add `'use client'` only when needed (state, effects, browser APIs)
+- Use proper metadata exports
+
+## Database
+
+### Supabase
+- Use Row Level Security (RLS) policies
+- Use service role client for admin operations
+- Use anon client with user session for user operations
+- Always validate user permissions
+
+### Queries
+- Use proper error handling
+- Log errors for debugging
+- Return meaningful error messages
+
+## File Organization
+
+### Structure
+- `/web/src/app` - Next.js App Router pages
+- `/web/src/components` - React components
+- `/web/src/lib` - Utility functions, database, auth
+- `/web/src/types` - TypeScript type definitions
+- `/web/docs` - Documentation
+
+### Naming
+- Use kebab-case for files: `session-detail.tsx`
+- Use PascalCase for components: `SessionDetail`
+- Use camelCase for functions: `getUserSession`
+
+## Database & Data Management
+
+### 🚨 CRITICAL: NEVER Delete Data Without Permission
+
+**NEVER NEVER NEVER:**
+- ❌ Run `supabase db reset` without explicit user approval
+- ❌ Run `DROP TABLE` or `TRUNCATE` commands
+- ❌ Delete user accounts or authentication data
+- ❌ Delete production data or user uploads
+- ❌ Run destructive database operations without asking first
+
+**ALWAYS:**
+- ✅ Ask before running any command that deletes data
+- ✅ Use migrations to ADD columns, not reset databases
+- ✅ Preserve existing user data when fixing bugs
+- ✅ Test schema changes without wiping data
+
+### Why:
+- Database resets delete user accounts, requiring re-authentication
+- Existing uploads and data are valuable, even if parsing needs fixes
+- Schema changes should be additive (migrations), not destructive (resets)
+- Users lose all their work when databases are reset
+
+### If Schema Changes Are Needed:
+1. Create a new migration file (e.g., `20241118000002_add_column.sql`)
+2. Use `ALTER TABLE ADD COLUMN` instead of recreating tables
+3. Test locally first, then ask user to apply migration
+4. NEVER use `db reset` on a database with user data
+
+## Git & Commits
+
+- Write clear, descriptive commit messages
+- Don't commit sensitive data (API keys, secrets)
+- Keep commits focused on single changes
+- Update documentation when adding features
+
+## Testing
+
+- Test critical user flows
+- Verify authentication and permissions
+- Check responsive design
+- Test light and dark themes
+
+## Documentation
+
+- Document new features in `/web/docs`
+- Update README when adding major features
+- Add inline comments for complex logic
+- Keep documentation up to date
+
