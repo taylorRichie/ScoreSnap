@@ -98,17 +98,6 @@ export default function Header() {
     ...(user && userProfile?.is_admin === true ? [{ name: 'Debug', href: '/debug/upload', requiresAuth: true }] : []),
   ]
 
-  // Debug logging
-  useEffect(() => {
-    if (user) {
-      console.log('Header - User:', user.email)
-      console.log('Header - User Profile:', userProfile)
-      console.log('Header - Is Admin:', userProfile?.is_admin)
-      console.log('Header - Claimed Bowler:', userProfile?.claimed_bowler_id)
-      console.log('Header - Navigation items:', navigation.map(n => n.name))
-    }
-  }, [user, userProfile])
-
   const isActive = (href: string) => {
     if (href === '/dashboard') {
       return pathname === href

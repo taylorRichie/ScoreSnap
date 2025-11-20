@@ -128,6 +128,7 @@ export default function SessionsPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid')
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+  const [isAdmin, setIsAdmin] = useState(false)
 
   const filteredSessions = useMemo(() => {
     const searchQuery = (columnFilters.find(f => f.id === 'search')?.value as string) || ''
@@ -260,17 +261,19 @@ export default function SessionsPage() {
         cell: ({ row }) => {
           return (
             <div className="flex items-center justify-end gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={(e) => {
-                  e.preventDefault()
-                  handleDeleteClick(row.original, e)
-                }}
-                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              {isAdmin && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    handleDeleteClick(row.original, e)
+                  }}
+                  className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
               <Button asChild variant="secondary" size="sm">
                 <Link href={`/sessions/${row.original.id}`}>View session</Link>
               </Button>
@@ -299,29 +302,45 @@ export default function SessionsPage() {
 
   useEffect(() => {
     if (!authLoading) {
+      fetchSessions()
       if (user) {
-        fetchSessions()
-      } else {
-        setLoading(false)
-        setError('Please log in to view your sessions')
+        fetchUserProfile()
       }
     }
-  }, [user, authLoading])
+  }, [authLoading, user])
+
+  const fetchUserProfile = async () => {
+    if (!user) return
+    
+    try {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('is_admin')
+        .eq('user_id', user.id)
+        .single()
+
+      if (!error && data) {
+        setIsAdmin(data.is_admin)
+      }
+    } catch (err) {
+      console.error('Error fetching user profile:', err)
+    }
+  }
 
   const fetchSessions = async () => {
     try {
       setLoading(true)
 
-      // Get the current session token
+      // Get the current session token (optional for public access)
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session?.access_token) {
-        throw new Error('No authentication session found')
+      
+      const headers: HeadersInit = {}
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`
       }
 
       const response = await fetch('/api/sessions', {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        }
+        headers
       })
 
       if (!response.ok) {
@@ -446,7 +465,7 @@ export default function SessionsPage() {
             <BreadcrumbList>
               <BreadcrumbItem>
                 <BreadcrumbLink asChild>
-                  <Link href="/dashboard">Dashboard</Link>
+                  <Link href="/">Home</Link>
                 </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator />
@@ -551,15 +570,17 @@ export default function SessionsPage() {
                   )}
                 </CardContent>
                 <CardFooter className="flex gap-2">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={(e) => handleDeleteClick(session, e)}
-                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                  <Button asChild variant="secondary" className="flex-1">
+                  {isAdmin && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => handleDeleteClick(session, e)}
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <Button asChild variant="secondary" className={isAdmin ? "flex-1" : "w-full"}>
                     <Link href={`/sessions/${session.id}`}>View session</Link>
                   </Button>
                 </CardFooter>

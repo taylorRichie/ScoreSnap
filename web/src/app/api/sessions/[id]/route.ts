@@ -38,89 +38,28 @@ export async function GET(
       }
     }
 
-    if (!sessionToken) {
-      return NextResponse.json(
-        { error: 'Unauthorized - No session token found' },
-        { status: 401 }
-      )
-    }
-
-    // Create Supabase client with the session token
-    const { createClient } = await import('@supabase/supabase-js')
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        global: {
-          headers: {
-            Authorization: `Bearer ${sessionToken}`
+    // Create Supabase client - use service role for public access, or user token if provided
+    let supabase
+    if (sessionToken) {
+      // Authenticated request - use user's token
+      const { createClient } = await import('@supabase/supabase-js')
+      supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+          global: {
+            headers: {
+              Authorization: `Bearer ${sessionToken}`
+            }
           }
         }
-      }
-    )
-
-    // Get the authenticated user
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized - Invalid session' },
-        { status: 401 }
       )
+    } else {
+      // Public access - use service role (read-only operations)
+      supabase = createServerSupabaseClient()
     }
 
-    // Check if user has access to this session:
-    // 1. User uploaded images for this session, OR
-    // 2. User has claimed bowlers that appear in this session
-
-    let hasAccess = false
-
-    // Check if user uploaded images for this session
-    const { data: uploads, error: uploadsError } = await supabase
-      .from('uploads')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('session_id', sessionId)
-      .limit(1)
-
-    if (uploadsError) {
-      console.error('Uploads check error:', uploadsError)
-    } else if (uploads && uploads.length > 0) {
-      hasAccess = true
-    }
-
-    // If not from uploads, check if user claimed bowlers in this session
-    if (!hasAccess) {
-      const { data: claimedBowlers, error: bowlersError } = await supabase
-        .from('bowlers')
-        .select('id')
-        .eq('primary_user_id', user.id)
-
-      if (bowlersError) {
-        console.error('Bowlers check error:', bowlersError)
-      } else if (claimedBowlers && claimedBowlers.length > 0) {
-        const bowlerIds = claimedBowlers.map(b => b.id)
-
-        const { data: series, error: seriesError } = await supabase
-          .from('series')
-          .select('id')
-          .eq('session_id', sessionId)
-          .in('bowler_id', bowlerIds)
-          .limit(1)
-
-        if (seriesError) {
-          console.error('Series check error:', seriesError)
-        } else if (series && series.length > 0) {
-          hasAccess = true
-        }
-      }
-    }
-
-    if (!hasAccess) {
-      return NextResponse.json(
-        { error: 'Access denied - You do not have permission to view this session' },
-        { status: 403 }
-      )
-    }
+    // Sessions are now public - no access check needed
 
     // Get session info with bowling alley details
     const { data: session, error: sessionError } = await supabase

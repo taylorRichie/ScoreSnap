@@ -302,9 +302,12 @@ export default function BowlerDetailPage() {
         .from('bowlers')
         .select('*')
         .eq('id', bowlerId)
-        .single()
+        .maybeSingle()
 
       if (bowlerError) throw bowlerError
+      if (!bowlerData) {
+        throw new Error('Bowler not found')
+      }
       setBowler(bowlerData)
 
       // Fetch games with session info to aggregate into sessions
@@ -401,9 +404,15 @@ export default function BowlerDetailPage() {
         }
       }
 
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching bowler data:', err)
-      setError('Failed to load bowler data')
+      console.error('Error details:', {
+        message: err?.message,
+        code: err?.code,
+        details: err?.details,
+        hint: err?.hint
+      })
+      setError(err?.message || 'Failed to load bowler data')
     } finally {
       setLoading(false)
     }
@@ -613,7 +622,7 @@ export default function BowlerDetailPage() {
           <BreadcrumbList>
             <BreadcrumbItem>
               <BreadcrumbLink asChild>
-                <Link href="/dashboard">Dashboard</Link>
+                <Link href="/">Home</Link>
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
@@ -822,14 +831,16 @@ export default function BowlerDetailPage() {
                     </div>
                   </CardContent>
                   <CardFooter className="flex gap-2">
-                    <Button 
-                      variant="ghost" 
-                      size="icon"
-                      onClick={() => handleOpenMergeDialog(session)}
-                      title="Merge this session into another bowler"
-                    >
-                      <GitMerge className="h-4 w-4" />
-                    </Button>
+                    {user && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        onClick={() => handleOpenMergeDialog(session)}
+                        title="Merge this session into another bowler"
+                      >
+                        <GitMerge className="h-4 w-4" />
+                      </Button>
+                    )}
                     <Button asChild variant="secondary" className="flex-1">
                       <Link href={`/sessions/${session.session_id}`}>View session</Link>
                     </Button>

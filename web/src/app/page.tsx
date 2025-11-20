@@ -20,13 +20,16 @@ interface DashboardStats {
     averageScore: number
     highestGame: {
       score: number
+      gameNumber: number
       bowler: string
+      bowlerId: string
       sessionId: string
       date: string
     } | null
     highestSeries: {
       score: number
       bowler: string
+      bowlerId: string
       sessionId: string
       date: string
     } | null
@@ -131,17 +134,19 @@ export default function HomePage() {
 
       {/* Summary Stats */}
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Sessions
-            </CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.stats.totalSessions.toLocaleString()}</div>
-          </CardContent>
-        </Card>
+        <Link href="/sessions">
+          <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Total Sessions
+              </CardTitle>
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.stats.totalSessions.toLocaleString()}</div>
+            </CardContent>
+          </Card>
+        </Link>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -155,29 +160,33 @@ export default function HomePage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Active Bowlers
-            </CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.stats.totalBowlers.toLocaleString()}</div>
-          </CardContent>
-        </Card>
+        <Link href="/bowlers">
+          <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Active Bowlers
+              </CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.stats.totalBowlers.toLocaleString()}</div>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Bowling Alleys
-            </CardTitle>
-            <MapPin className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.stats.totalAlleys.toLocaleString()}</div>
-          </CardContent>
-        </Card>
+        <Link href="/alleys">
+          <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Bowling Alleys
+              </CardTitle>
+              <MapPin className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.stats.totalAlleys.toLocaleString()}</div>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       {/* Highlights */}
@@ -202,54 +211,56 @@ export default function HomePage() {
 
         {/* Highest Game */}
         {stats.stats.highestGame && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Trophy className="h-5 w-5 text-yellow-500" />
-                Highest Game
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-4xl font-bold text-foreground">
-                {stats.stats.highestGame.score}
-              </div>
-              <Link 
-                href={`/bowlers/${stats.stats.highestGame.bowler}`}
-                className="text-sm text-primary hover:underline mt-2 block"
-              >
-                {stats.stats.highestGame.bowler}
-              </Link>
-              <p className="text-xs text-muted-foreground mt-1">
-                {new Date(stats.stats.highestGame.date).toLocaleDateString()}
-              </p>
-            </CardContent>
-          </Card>
+          <Link 
+            href={`/sessions/${stats.stats.highestGame.sessionId}?highlightGame=${stats.stats.highestGame.gameNumber}&bowlerId=${stats.stats.highestGame.bowlerId}`}
+          >
+            <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Trophy className="h-5 w-5 text-yellow-500" />
+                  Highest Game
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-4xl font-bold text-foreground">
+                  {stats.stats.highestGame.score}
+                </div>
+                <p className="text-sm text-primary mt-2">
+                  {stats.stats.highestGame.bowler}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {new Date(stats.stats.highestGame.date).toLocaleDateString()}
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
         )}
 
         {/* Highest Series */}
         {stats.stats.highestSeries && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Trophy className="h-5 w-5 text-blue-500" />
-                Highest Series
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-4xl font-bold text-foreground">
-                {stats.stats.highestSeries.score}
-              </div>
-              <Link 
-                href={`/bowlers/${stats.stats.highestSeries.bowler}`}
-                className="text-sm text-primary hover:underline mt-2 block"
-              >
-                {stats.stats.highestSeries.bowler}
-              </Link>
-              <p className="text-xs text-muted-foreground mt-1">
-                {new Date(stats.stats.highestSeries.date).toLocaleDateString()}
-              </p>
-            </CardContent>
-          </Card>
+          <Link 
+            href={`/sessions/${stats.stats.highestSeries.sessionId}?highlightBowler=${stats.stats.highestSeries.bowlerId}`}
+          >
+            <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Trophy className="h-5 w-5 text-blue-500" />
+                  Highest Series
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-4xl font-bold text-foreground">
+                  {stats.stats.highestSeries.score}
+                </div>
+                <p className="text-sm text-primary mt-2">
+                  {stats.stats.highestSeries.bowler}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {new Date(stats.stats.highestSeries.date).toLocaleDateString()}
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
         )}
       </div>
 

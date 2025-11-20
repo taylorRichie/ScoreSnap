@@ -32,32 +32,39 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    if (!sessionToken) {
-      return NextResponse.json(
-        { error: 'Unauthorized - No session token found' },
-        { status: 401 }
-      )
-    }
-
-    // Create Supabase client with the session token
-    const { createClient } = await import('@supabase/supabase-js')
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        global: {
-          headers: {
-            Authorization: `Bearer ${sessionToken}`
+    // Create Supabase client - use service role for public access, or user token if provided
+    let supabase
+    let user = null
+    
+    if (sessionToken) {
+      // Authenticated request - use user's token
+      const { createClient } = await import('@supabase/supabase-js')
+      supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+          global: {
+            headers: {
+              Authorization: `Bearer ${sessionToken}`
+            }
           }
         }
+      )
+      
+      // Get the authenticated user
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
+      if (!authError && authUser) {
+        user = authUser
       }
-    )
+    } else {
+      // Public access - use service role (read-only operations)
+      supabase = createServerSupabaseClient()
+    }
 
-    // Get the authenticated user
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
+    // Remove the auth check error
+    if (false) {
       return NextResponse.json(
-        { error: 'Unauthorized - Invalid session' },
+        { error: 'This should never happen' },
         { status: 401 }
       )
     }
@@ -68,44 +75,58 @@ export async function GET(request: NextRequest) {
 
     const sessionIds = new Set<string>()
 
-    // Method 1: Sessions from user's uploads
-    const { data: uploads, error: uploadsError } = await supabase
-      .from('uploads')
-      .select('session_id')
-      .eq('user_id', user.id)
-      .not('session_id', 'is', null)
-
-    if (uploadsError) {
-      console.error('Uploads error:', uploadsError)
-    } else if (uploads && uploads.length > 0) {
-      uploads.forEach(u => {
-        if (u.session_id) sessionIds.add(u.session_id)
-      })
-    }
-
-    // Method 2: Sessions where user's claimed bowlers appear
-    const { data: claimedBowlers, error: bowlersError } = await supabase
-      .from('bowlers')
-      .select('id')
-      .eq('primary_user_id', user.id)
-
-    if (bowlersError) {
-      console.error('Bowlers error:', bowlersError)
-    } else if (claimedBowlers && claimedBowlers.length > 0) {
-      const bowlerIds = claimedBowlers.map(b => b.id)
-
-      // Find series for these bowlers
-      const { data: series, error: seriesError } = await supabase
-        .from('series')
+    if (user) {
+      // Authenticated: Show user's sessions
+      // Method 1: Sessions from user's uploads
+      const { data: uploads, error: uploadsError } = await supabase
+        .from('uploads')
         .select('session_id')
-        .in('bowler_id', bowlerIds)
+        .eq('user_id', user.id)
+        .not('session_id', 'is', null)
 
-      if (seriesError) {
-        console.error('Series error:', seriesError)
-      } else if (series && series.length > 0) {
-        series.forEach(s => {
-          if (s.session_id) sessionIds.add(s.session_id)
+      if (uploadsError) {
+        console.error('Uploads error:', uploadsError)
+      } else if (uploads && uploads.length > 0) {
+        uploads.forEach(u => {
+          if (u.session_id) sessionIds.add(u.session_id)
         })
+      }
+
+      // Method 2: Sessions where user's claimed bowlers appear
+      const { data: claimedBowlers, error: bowlersError } = await supabase
+        .from('bowlers')
+        .select('id')
+        .eq('claimed_by_user_id', user.id)
+
+      if (bowlersError) {
+        console.error('Bowlers error:', bowlersError)
+      } else if (claimedBowlers && claimedBowlers.length > 0) {
+        const bowlerIds = claimedBowlers.map(b => b.id)
+
+        // Find series for these bowlers
+        const { data: series, error: seriesError } = await supabase
+          .from('series')
+          .select('session_id')
+          .in('bowler_id', bowlerIds)
+
+        if (seriesError) {
+          console.error('Series error:', seriesError)
+        } else if (series && series.length > 0) {
+          series.forEach(s => {
+            if (s.session_id) sessionIds.add(s.session_id)
+          })
+        }
+      }
+    } else {
+      // Public: Show all sessions
+      const { data: allSessions, error: allSessionsError } = await supabase
+        .from('sessions')
+        .select('id')
+
+      if (allSessionsError) {
+        console.error('All sessions error:', allSessionsError)
+      } else if (allSessions) {
+        allSessions.forEach(s => sessionIds.add(s.id))
       }
     }
 

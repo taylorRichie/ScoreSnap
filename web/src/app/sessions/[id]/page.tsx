@@ -156,15 +156,10 @@ export default function SessionDetailPage() {
   const teamScoreRefs = useRef<{ [key: string]: HTMLDivElement | null }>({})
 
   useEffect(() => {
-    if (!authLoading) {
-      if (user && sessionId) {
-        fetchSessionData()
-      } else if (!user) {
-        setLoading(false)
-        setError('Please log in to view session details')
-      }
+    if (!authLoading && sessionId) {
+      fetchSessionData()
     }
-  }, [user, authLoading, sessionId])
+  }, [authLoading, sessionId])
 
   // Keyboard navigation for image gallery
   useEffect(() => {
@@ -191,16 +186,16 @@ export default function SessionDetailPage() {
     try {
       setLoading(true)
 
-      // Get the current session token
+      // Get the current session token (optional for public access)
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session?.access_token) {
-        throw new Error('No authentication session found')
+      
+      const headers: HeadersInit = {}
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`
       }
 
       const response = await fetch(`/api/sessions/${sessionId}`, {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        }
+        headers
       })
 
       if (!response.ok) {
@@ -500,22 +495,36 @@ export default function SessionDetailPage() {
         const game = bowler?.games.find(g => g.game_number === gameNumber)
         
         if (game && bowler) {
+          console.log('Deep link: highlighting game', { gameNumber, bowlerId: bowler.bowler.id, gameId: game.id })
           // Small delay to ensure DOM is ready
           setTimeout(() => {
             handleScoreClick(game.id, bowler.bowler.id, gameNumber)
           }, 500)
+        } else {
+          console.log('Deep link: game not found', { gameNumber, bowlerId: bowlerIdParam, bowlerFound: !!bowler, gameFound: !!game })
         }
       } else if (highlightBowlerParam) {
-        // Scroll to scores section
+        console.log('Deep link: highlighting bowler', { bowlerId: highlightBowlerParam })
+        // Scroll to bowler's score in the scores section
         setTimeout(() => {
-          const scoresSection = document.querySelector('[class*="space-y-4"] h2')
-          if (scoresSection && scoresSection.textContent === 'Scores') {
-            scoresSection.parentElement?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          const bowler = bowlerScores.find(bs => bs.bowler.id === highlightBowlerParam)
+          if (bowler) {
+            // Try to find the team score ref for this bowler's team
+            const bowlerTeam = teams.find(t => t.team_bowlers.some(tb => tb.bowler.id === highlightBowlerParam))
+            if (bowlerTeam && teamScoreRefs.current[bowlerTeam.id]) {
+              teamScoreRefs.current[bowlerTeam.id]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            } else {
+              // Fallback: scroll to scores section
+              const scoresSection = document.querySelector('[class*="space-y-4"] h2')
+              if (scoresSection && scoresSection.textContent?.includes('Scores')) {
+                scoresSection.parentElement?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+              }
+            }
           }
         }, 300)
       }
     }
-  }, [loading, bowlerScores, searchParams, handleScoreClick])
+  }, [loading, bowlerScores, searchParams, teams])
 
   // Clear highlight on any click
   useEffect(() => {
@@ -548,7 +557,7 @@ export default function SessionDetailPage() {
           </CardHeader>
           <CardFooter>
             <Button asChild variant="secondary" className="w-full">
-              <Link href="/dashboard">Back to dashboard</Link>
+              <Link href="/">Back to home</Link>
             </Button>
           </CardFooter>
         </Card>
@@ -625,7 +634,7 @@ export default function SessionDetailPage() {
           <BreadcrumbList>
             <BreadcrumbItem>
               <BreadcrumbLink asChild>
-                <Link href="/dashboard">Dashboard</Link>
+                <Link href="/">Home</Link>
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
@@ -680,20 +689,24 @@ export default function SessionDetailPage() {
                       {session.name || session.bowling_alleys?.name || session.bowling_alley_name || 'Bowling session'}
                     </CardTitle>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={handleEditName}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setDeleteDialogOpen(true)}
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+                  {user && (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleEditName}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setDeleteDialogOpen(true)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </>
+                  )}
                 </>
               )}
             </div>
@@ -872,33 +885,37 @@ export default function SessionDetailPage() {
                               <Trophy className="h-4 w-4 text-yellow-500 shrink-0" />
                             )}
                             <CardTitle className="text-base flex-1">{team.name}</CardTitle>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleEditTeamName(team.id, team.name)
-                              }}
-                              className="h-7 w-7 p-0"
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleGenerateTeamName(team.id)
-                              }}
-                              disabled={generatingTeamName === team.id}
-                              className="h-7 w-7 p-0"
-                            >
-                              {generatingTeamName === team.id ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              ) : (
-                                <Sparkles className="h-3.5 w-3.5" />
-                              )}
-                            </Button>
+                            {user && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleEditTeamName(team.id, team.name)
+                                  }}
+                                  className="h-7 w-7 p-0"
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleGenerateTeamName(team.id)
+                                  }}
+                                  disabled={generatingTeamName === team.id}
+                                  className="h-7 w-7 p-0"
+                                >
+                                  {generatingTeamName === team.id ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <Sparkles className="h-3.5 w-3.5" />
+                                  )}
+                                </Button>
+                              </>
+                            )}
                           </>
                         )}
                       </div>
@@ -1156,27 +1173,31 @@ export default function SessionDetailPage() {
                           ) : (
                             <>
                               <CardTitle className="text-base">{team.name}</CardTitle>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleEditTeamName(team.id, team.name)}
-                                className="h-7 w-7 p-0"
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleGenerateTeamName(team.id)}
-                                disabled={generatingTeamName === team.id}
-                                className="h-7 w-7 p-0"
-                              >
-                                {generatingTeamName === team.id ? (
-                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                ) : (
-                                  <Sparkles className="h-3.5 w-3.5" />
-                                )}
-                              </Button>
+                              {user && (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleEditTeamName(team.id, team.name)}
+                                    className="h-7 w-7 p-0"
+                                  >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleGenerateTeamName(team.id)}
+                                    disabled={generatingTeamName === team.id}
+                                    className="h-7 w-7 p-0"
+                                  >
+                                    {generatingTeamName === team.id ? (
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    ) : (
+                                      <Sparkles className="h-3.5 w-3.5" />
+                                    )}
+                                  </Button>
+                                </>
+                              )}
                             </>
                           )}
                         </div>
@@ -1424,27 +1445,31 @@ export default function SessionDetailPage() {
                                   ) : (
                                     <>
                                       <h3 className="text-sm font-semibold text-muted-foreground">{team.name}</h3>
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={() => handleEditTeamName(team.id, team.name)}
-                                        className="h-6 w-6 p-0"
-                                      >
-                                        <Pencil className="h-3 w-3" />
-                                      </Button>
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={() => handleGenerateTeamName(team.id)}
-                                        disabled={generatingTeamName === team.id}
-                                        className="h-6 w-6 p-0"
-                                      >
-                                        {generatingTeamName === team.id ? (
-                                          <Loader2 className="h-3 w-3 animate-spin" />
-                                        ) : (
-                                          <Sparkles className="h-3 w-3" />
-                                        )}
-                                      </Button>
+                                      {user && (
+                                        <>
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => handleEditTeamName(team.id, team.name)}
+                                            className="h-6 w-6 p-0"
+                                          >
+                                            <Pencil className="h-3 w-3" />
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => handleGenerateTeamName(team.id)}
+                                            disabled={generatingTeamName === team.id}
+                                            className="h-6 w-6 p-0"
+                                          >
+                                            {generatingTeamName === team.id ? (
+                                              <Loader2 className="h-3 w-3 animate-spin" />
+                                            ) : (
+                                              <Sparkles className="h-3 w-3" />
+                                            )}
+                                          </Button>
+                                        </>
+                                      )}
                                     </>
                                   )}
                                 </div>

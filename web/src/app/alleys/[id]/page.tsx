@@ -63,10 +63,10 @@ export default function AlleyDetailPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!authLoading && user && alleyId) {
+    if (!authLoading && alleyId) {
       fetchAlleyData()
     }
-  }, [user, authLoading, alleyId])
+  }, [authLoading, alleyId])
 
   const fetchAlleyData = async () => {
     try {
@@ -77,9 +77,12 @@ export default function AlleyDetailPage() {
         .from('bowling_alleys')
         .select('*')
         .eq('id', alleyId)
-        .single()
+        .maybeSingle()
 
       if (alleyError) throw alleyError
+      if (!alleyData) {
+        throw new Error('Bowling alley not found')
+      }
       setAlley(alleyData)
 
       // Fetch sessions at this alley
@@ -141,7 +144,7 @@ export default function AlleyDetailPage() {
           <BreadcrumbList>
             <BreadcrumbItem>
               <BreadcrumbLink asChild>
-                <Link href="/dashboard">Dashboard</Link>
+                <Link href="/">Home</Link>
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
