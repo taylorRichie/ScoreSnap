@@ -82,7 +82,7 @@ This ensures photos taken from different parts of the same bowling alley are cor
 
 ## API Configuration
 
-Your API key is already configured in `.env.local`:
+Your API key should be configured in `.env.local`:
 
 ```bash
 GOOGLE_PLACES_API_KEY=your-google-api-key-here
