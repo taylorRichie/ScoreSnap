@@ -59,7 +59,7 @@ export const dynamic = 'force-dynamic'
 interface Bowler {
   id: string
   canonical_name: string
-  claimed_by_user_id: string | null
+  primary_user_id: string | null
   created_by_user_id: string
   created_at: string
   game_count?: number
@@ -167,12 +167,12 @@ export default function BowlersPage() {
         id: 'status',
         header: () => <div className="text-center">Status</div>,
         cell: ({ row }) => {
-          const isClaimedByUser = row.original.claimed_by_user_id === user?.id
-          const claimedBySomeone = row.original.claimed_by_user_id && !isClaimedByUser
+          const isClaimedByUser = row.original.primary_user_id === user?.id
+          const claimedBySomeone = row.original.primary_user_id && !isClaimedByUser
           return (
             <div className="text-center">
               {claimedBySomeone && <Badge variant="outline">Claimed</Badge>}
-              {!row.original.claimed_by_user_id && <Badge variant="outline">Unclaimed</Badge>}
+              {!row.original.primary_user_id && <Badge variant="outline">Unclaimed</Badge>}
             </div>
           )
         },
@@ -181,10 +181,10 @@ export default function BowlersPage() {
         id: 'actions',
         header: () => <div className="text-right">Actions</div>,
         cell: ({ row }) => {
-          const isClaimedByUser = row.original.claimed_by_user_id === user?.id
+          const isClaimedByUser = row.original.primary_user_id === user?.id
           return (
             <div className="flex items-center justify-end gap-2">
-              {user && (row.original.created_by_user_id === user.id || row.original.claimed_by_user_id === user.id) && (
+              {user && (row.original.created_by_user_id === user.id || row.original.primary_user_id === user.id) && (
                 <Button
                   variant="ghost"
                   size="icon"
@@ -449,8 +449,8 @@ export default function BowlersPage() {
         ) : viewMode === 'grid' ? (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {filteredBowlers.map((bowler) => {
-              const isClaimedByUser = bowler.claimed_by_user_id === user?.id
-              const claimedBySomeone = bowler.claimed_by_user_id && !isClaimedByUser
+              const isClaimedByUser = bowler.primary_user_id === user?.id
+              const claimedBySomeone = bowler.primary_user_id && !isClaimedByUser
 
               return (
                 <Card key={bowler.id} className="h-full">

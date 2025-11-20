@@ -1,5 +1,29 @@
 # ScoreSnap Development Rules
 
+## 🚨 CRITICAL: Git & Version Control
+
+**NEVER CHECK INTO GIT WITHOUT CHECKING WITH ME FIRST**
+
+### Rules:
+- ❌ **NEVER** run `git commit` without explicit user approval
+- ❌ **NEVER** run `git push` without explicit user approval
+- ❌ **NEVER** run `git add` and commit in the same action without asking
+- ✅ **ALWAYS** ask the user before making any Git commits
+- ✅ **ALWAYS** show what changes will be committed and get approval
+- ✅ **ALWAYS** let the user review diffs before committing
+
+### Why:
+- User maintains full control over what goes into version history
+- Prevents accidental commits of work-in-progress code
+- Allows user to review commit messages and changes
+- Ensures commit history reflects intentional milestones
+
+### Allowed Without Asking:
+- `git status` - Checking status is always safe
+- `git diff` - Reviewing changes is always safe
+- `git log` - Viewing history is always safe
+- Reading `.gitignore` or other Git config files
+
 ## 🚨 CRITICAL: UI Components
 
 **NEVER create custom UI components. ALWAYS use shadcn/ui.**
@@ -130,6 +154,9 @@
 
 ## Git & Commits
 
+**🚨 REMINDER: NEVER commit without user approval (see top of file)**
+
+### When User Approves Commits:
 - Write clear, descriptive commit messages
 - Don't commit sensitive data (API keys, secrets)
 - Keep commits focused on single changes
